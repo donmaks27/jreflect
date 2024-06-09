@@ -20,8 +20,8 @@ namespace jreflect
         class_field() = default;
         virtual ~class_field() = default;
 
-        class_field_type getType() const { return m_Type; }
-        jutils::jstringID getName() const { return m_Name; }
+        [[nodiscard]] class_field_type getType() const { return m_Type; }
+        [[nodiscard]] jutils::jstringID getName() const { return m_Name; }
 
     protected:
 
@@ -84,7 +84,7 @@ namespace jreflect
         }
         virtual ~class_field_object() override = default;
 
-        class_type* getObjectType() const { return m_ObjectType; }
+        [[nodiscard]] class_type* getObjectType() const { return m_ObjectType; }
 
     private:
 
@@ -104,7 +104,7 @@ namespace jreflect
         }
         virtual ~class_field_object_ptr() override = default;
 
-        class_type* getObjectType() const { return m_ObjectType; }
+        [[nodiscard]] class_type* getObjectType() const { return m_ObjectType; }
 
     private:
 

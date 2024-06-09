@@ -29,15 +29,15 @@ namespace jreflect
         static constexpr bool _helper_has_class_type = !std::is_same_v<_helper_class_type_t<T1>, class_type>;
 
         JUTILS_TEMPLATE_CONDITION(_helper_has_class_type<T1>, typename T1)
-        static auto* _helper_get_class_type(jutils::int32) { return T1::GetClassType(); }
+        [[nodiscard]] static auto* _helper_get_class_type(jutils::int32) { return T1::GetClassType(); }
         template<typename T1>
-        static class_type* _helper_get_class_type(jutils::int8) { return nullptr; }
+        [[nodiscard]] static class_type* _helper_get_class_type(jutils::int8) { return nullptr; }
 
     public:
         using class_type_t = _helper_class_type_t<T>;
         static constexpr bool has_class_type = !std::is_same_v<_helper_class_type_t<T>, class_type>;
 
-        static auto* get_class_type() { return _helper_get_class_type<T>(0); }
+        [[nodiscard]] static auto* get_class_type() { return _helper_get_class_type<T>(0); }
     };
     template<typename T>
     using get_class_type_t = typename class_type_info<T>::class_type_t;
@@ -50,14 +50,14 @@ namespace jreflect
         class_type() = default;
         virtual ~class_type() = default;
 
-        virtual jutils::jstringID getName() const = 0;
-        virtual class_type* getParent() const = 0;
+        [[nodiscard]] virtual jutils::jstringID getName() const = 0;
+        [[nodiscard]] virtual class_type* getParent() const = 0;
 
-        bool isDerived(const class_type* type) const { return (type != nullptr) && isDerivedFromClass(type); }
+        [[nodiscard]] bool isDerived(const class_type* type) const { return (type != nullptr) && isDerivedFromClass(type); }
         JUTILS_TEMPLATE_CONDITION(has_class_type_v<T>, typename T)
-        bool isDerived() const { return this->isDerived(class_type_info<T>::get_class_type()); }
+        [[nodiscard]] bool isDerived() const { return this->isDerived(class_type_info<T>::get_class_type()); }
 
-        const auto& getFields() const { return m_Fields; }
+        [[nodiscard]] const auto& getFields() const { return m_Fields; }
 
     protected:
 
@@ -121,6 +121,11 @@ namespace jreflect
                 delete field;
             }
         }
+
+    private:
+
+        jutils::jmap<jutils::jstringID, class_field*> m_Fields;
+        jutils::jarray<jutils::jstringID> m_FieldsOrder;
         
         template<typename T>
         static class_field* CreateClassField(const jutils::jstringID& name, const std::size_t offset)
@@ -143,11 +148,6 @@ namespace jreflect
             }
             return nullptr;
         }
-
-    private:
-
-        jutils::jmap<jutils::jstringID, class_field*> m_Fields;
-        jutils::jarray<jutils::jstringID> m_FieldsOrder;
 
         template<typename T>
         static bool InitClassField(class_field* field)
@@ -182,7 +182,7 @@ namespace jreflect
         using this_t = class_interface;
         using class_type_t = class_type;
 
-        virtual class_type* getClassType() const = 0;
+        [[nodiscard]] virtual class_type* getClassType() const = 0;
     };
 
 #define JREFLECT_CLASS_FIELD_NAMED(Field, FieldName)                            \
@@ -195,40 +195,40 @@ namespace jreflect
     auto createInfo = Info;                                                             \
     createClassField<decltype(createInfo)::type>(createInfo.name, createInfo.offset);   \
 }
-#define JREFLECT_CLASS_TYPE(ClassName, ...)                                                                 \
-public:                                                                                                     \
-    using parent_t = this_t;                                                                                \
-    using this_t = ClassName;                                                                               \
-    class class_type_##ClassName : public parent_t::class_type_t                                            \
-    {                                                                                                       \
-    public:                                                                                                 \
-        using type = this_t;                                                                                \
-        class_type_##ClassName() { __VA_OPT__(                                                              \
-            static constexpr bool is_init = false;                                                          \
-            JUTILS_WRAP(JREFLECT_HELPER_CREATE_CLASS_FIELD, __VA_ARGS__)                                    \
-            initClassFields_##ClassName();                                                                  \
-        ) }                                                                                                 \
-        static jutils::jstringID GetName() { return #ClassName; }                                           \
-        virtual jutils::jstringID getName() const override { return GetName(); }                            \
-        static auto* GetParent() { return jreflect::class_type_info<parent_t>::get_class_type(); }          \
-        virtual jreflect::class_type* getParent() const override { return GetParent(); }                    \
-    protected:                                                                                              \
-        virtual bool isDerivedFromClass(const jreflect::class_type* type) const override                    \
-            { return (type::GetClassType() == this) || parent_t::class_type_t::isDerivedFromClass(type); }  \
-    private:                                                                                                \
-        __VA_OPT__(void initClassFields_##ClassName();)                                                     \
-    };                                                                                                      \
-    using class_type_t = class_type_##ClassName;                                                            \
-    static class_type_t* GetClassType() { static class_type_t classType; return &classType; }               \
-    virtual jreflect::class_type* getClassType() const override { return GetClassType(); }
+#define JREFLECT_CLASS_TYPE(ClassName, ...)                                                                     \
+public:                                                                                                         \
+    using parent_t = this_t;                                                                                    \
+    using this_t = ClassName;                                                                                   \
+    class class_type_##ClassName : public parent_t::class_type_t                                                \
+    {                                                                                                           \
+    public:                                                                                                     \
+        using type = this_t;                                                                                    \
+        class_type_##ClassName() { __VA_OPT__(                                                                  \
+            static constexpr bool is_init = false;                                                              \
+            JUTILS_WRAP(JREFLECT_HELPER_CREATE_CLASS_FIELD, __VA_ARGS__)                                        \
+            initClassFields_##ClassName();                                                                      \
+        ) }                                                                                                     \
+        [[nodiscard]] static jutils::jstringID GetName() { return #ClassName; }                                 \
+        [[nodiscard]] virtual jutils::jstringID getName() const override { return GetName(); }                  \
+        [[nodiscard]] static auto* GetParent() { return jreflect::class_type_info<parent_t>::get_class_type(); }\
+        [[nodiscard]] virtual jreflect::class_type* getParent() const override { return GetParent(); }          \
+    protected:                                                                                                  \
+        virtual bool isDerivedFromClass(const jreflect::class_type* type) const override                        \
+            { return (type::GetClassType() == this) || parent_t::class_type_t::isDerivedFromClass(type); }      \
+    private:                                                                                                    \
+        __VA_OPT__(void initClassFields_##ClassName();)                                                         \
+    };                                                                                                          \
+    using class_type_t = class_type_##ClassName;                                                                \
+    [[nodiscard]] static class_type_t* GetClassType() { static class_type_t classType; return &classType; }     \
+    [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }
     
-#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                \
-    auto createInfo = Info;                                     \
-    initClassField<decltype(createInfo)::type>(createInfo.name);\
-}
-#define JREFLECT_INIT_CLASS_TYPE(Namespace, ClassName, ...)                         \
-__VA_OPT__(void Namespace::ClassName::class_type_t::initClassFields_##ClassName() {  \
-    static constexpr bool is_init = true;                                           \
-    JUTILS_WRAP(JREFLECT_HELPER_INIT_CLASS_FIELD, __VA_ARGS__)                      \
-})
+#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                    \
+        auto createInfo = Info;                                     \
+        initClassField<decltype(createInfo)::type>(createInfo.name);\
+    }
+#define JREFLECT_INIT_CLASS_TYPE(Namespace, ClassName, ...)                             \
+    __VA_OPT__(void Namespace::ClassName::class_type_t::initClassFields_##ClassName() { \
+        static constexpr bool is_init = true;                                           \
+        JUTILS_WRAP(JREFLECT_HELPER_INIT_CLASS_FIELD, __VA_ARGS__)                      \
+    })
 }
