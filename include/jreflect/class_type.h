@@ -75,6 +75,12 @@ namespace jreflect
         }
     };
 
+    struct class_field_factory_default
+    {
+        template<typename T>
+        static class_field* construct(const jutils::jstringID& name, std::size_t offset);
+    };
+
     class class_field_object_ptr;
     class class_field_object;
 
@@ -141,7 +147,7 @@ namespace jreflect
 
         virtual bool isDerivedFromClass(const class_type* type) const { return false; }
         
-        template<typename T>
+        template<typename T, typename ClassFieldFactory = class_field_factory_default>
         void createClassField(const jutils::jstringID& name, std::size_t offset);
         template<typename T>
         void initClassField(const jutils::jstringID& name);
@@ -150,8 +156,6 @@ namespace jreflect
 
         jutils::jmap<jutils::jstringID, class_field*> m_Fields;
         
-        template<typename T>
-        static class_field* CreateClassField(const jutils::jstringID& name, std::size_t offset);
         template<typename T>
         static bool InitClassField(class_field* field);
         JUTILS_TEMPLATE_CONDITION(has_class_type_v<T>, typename T)
@@ -304,7 +308,6 @@ namespace jreflect
     };
     template<> struct class_field_info<class_field_type::object> { using type = class_field_object; };
     
-    // TODO: How to handle fields like object_ptr<objType>, not just objType*?
     class class_field_object_ptr : public class_field, public std::true_type
     {
         friend class_type;
@@ -355,56 +358,8 @@ namespace jreflect
     };
     template<> struct class_field_info<class_field_type::object_ptr> { using type = class_field_object_ptr; };
 
-
-
     template <typename T>
-    void class_type::createClassField(const jutils::jstringID& name, const std::size_t offset)
-    {
-        if (!name.isValid())
-        {
-            return;
-        }
-
-        const bool uniqueField = !m_Fields.contains(name);
-        assert(uniqueField);
-        if (!uniqueField)
-        {
-            delete m_Fields[name];
-            m_Fields.remove(name);
-        }
-
-        class_field* field = CreateClassField<T>(name, offset);
-        const bool fieldCreated = field != nullptr;
-        assert(fieldCreated);
-        if (!fieldCreated)
-        {
-            return;
-        }
-
-        m_Fields.add(name, field);
-    }
-    template <typename T>
-    void class_type::initClassField(const jutils::jstringID& name)
-    {
-        class_field** fieldPtr = m_Fields.find(name);
-        if (fieldPtr == nullptr)
-        {
-            return;
-        }
-
-        class_field* field = *fieldPtr;
-        const bool fieldInitialized = InitClassField<T>(field);
-        assert(fieldInitialized);
-
-        if (!fieldInitialized)
-        {
-            m_Fields.remove(name);
-            delete field;
-        }
-    }
-
-    template <typename T>
-    class_field* class_type::CreateClassField(const jutils::jstringID& name, const std::size_t offset)
+    class_field* class_field_factory_default::construct(const jutils::jstringID& name, std::size_t offset)
     {
         if constexpr (class_field_simple<T>::value)
         {
@@ -424,7 +379,56 @@ namespace jreflect
         }
         return nullptr;
     }
-    template <typename T>
+
+
+
+    template<typename T, typename ClassFieldFactory>
+    void class_type::createClassField(const jutils::jstringID& name, const std::size_t offset)
+    {
+        if (!name.isValid())
+        {
+            return;
+        }
+
+        const bool uniqueField = !m_Fields.contains(name);
+        assert(uniqueField);
+        if (!uniqueField)
+        {
+            delete m_Fields[name];
+            m_Fields.remove(name);
+        }
+
+        class_field* field = ClassFieldFactory::template construct<T>(name, offset);
+        const bool fieldCreated = field != nullptr;
+        assert(fieldCreated);
+        if (!fieldCreated)
+        {
+            return;
+        }
+
+        m_Fields.add(name, field);
+    }
+
+    template<typename T>
+    void class_type::initClassField(const jutils::jstringID& name)
+    {
+        class_field** fieldPtr = m_Fields.find(name);
+        if (fieldPtr == nullptr)
+        {
+            return;
+        }
+
+        class_field* field = *fieldPtr;
+        const bool fieldInitialized = InitClassField<T>(field);
+        assert(fieldInitialized);
+
+        if (!fieldInitialized)
+        {
+            m_Fields.remove(name);
+            delete field;
+        }
+    }
+    template<typename T>
     bool class_type::InitClassField(class_field* field)
     {
         if (field == nullptr)
