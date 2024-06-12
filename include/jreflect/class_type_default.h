@@ -27,20 +27,26 @@ public:                                                                         
         class_type_##ClassName() { __VA_OPT__(                                                                  \
             static constexpr bool is_init = false;                                                              \
             JUTILS_WRAP(JREFLECT_HELPER_CREATE_CLASS_FIELD, __VA_ARGS__)                                        \
-            initClassFields_##ClassName();                                                                      \
         ) }                                                                                                     \
         [[nodiscard]] static jutils::jstringID GetName() { return #ClassName; }                                 \
         [[nodiscard]] virtual jutils::jstringID getName() const override { return GetName(); }                  \
         [[nodiscard]] static auto* GetParent() { return jreflect::class_type_info<parent_t>::get_class_type(); }\
         [[nodiscard]] virtual jreflect::class_type* getParent() const override { return GetParent(); }          \
     protected:                                                                                                  \
+        __VA_OPT__(virtual void initializeClassType() override {                                                \
+            parent_t::class_type_t::initializeClassType();                                                      \
+            initClassFields_##ClassName();                                                                      \
+        })                                                                                                      \
         virtual bool isDerivedFromClass(const jreflect::class_type* type) const override                        \
             { return (type::GetClassType() == this) || parent_t::class_type_t::isDerivedFromClass(type); }      \
     private:                                                                                                    \
         __VA_OPT__(void initClassFields_##ClassName();)                                                         \
     };                                                                                                          \
     using class_type_t = class_type_##ClassName;                                                                \
-    [[nodiscard]] static class_type_t* GetClassType() { static class_type_t classType; return &classType; }     \
+    [[nodiscard]] static class_type_t* GetClassType_Raw() { static class_type_t classType; return &classType; } \
+    [[nodiscard]] static class_type_t* GetClassType() {                                                         \
+        class_type_t* classType = GetClassType_Raw(); classType->initialize(); return classType;                \
+    }                                                                                                           \
     [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }        \
 protected:                                                                                                      \
     virtual bool copyFromInternal(const jreflect::class_interface& value) override                              \

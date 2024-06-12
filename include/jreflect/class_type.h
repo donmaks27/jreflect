@@ -103,16 +103,17 @@ namespace jreflect
         template<typename T1>
         static constexpr bool _helper_has_class_type = !std::is_same_v<_helper_class_type_t<T1>, class_type>;
 
-        JUTILS_TEMPLATE_CONDITION(_helper_has_class_type<T1>, typename T1)
-        [[nodiscard]] static auto* _helper_get_class_type(jutils::int32) { return T1::GetClassType(); }
-        template<typename T1>
+        JUTILS_TEMPLATE_CONDITION(_helper_has_class_type<T1>, typename T1, bool Raw)
+        [[nodiscard]] static auto* _helper_get_class_type(jutils::int32) { return Raw ? T1::GetClassType_Raw() : T1::GetClassType(); }
+        template<typename T1, bool>
         [[nodiscard]] static class_type* _helper_get_class_type(jutils::int8) { return nullptr; }
 
     public:
         using class_type_t = _helper_class_type_t<T>;
         static constexpr bool has_class_type = !std::is_same_v<_helper_class_type_t<T>, class_type>;
-
-        [[nodiscard]] static auto* get_class_type() { return _helper_get_class_type<T>(0); }
+        
+        [[nodiscard]] static auto* get_class_type_raw() { return _helper_get_class_type<T, true>(0); }
+        [[nodiscard]] static auto* get_class_type() { return _helper_get_class_type<T, false>(0); }
     };
     template<typename T>
     using get_class_type_t = typename class_type_info<T>::class_type_t;
@@ -124,6 +125,15 @@ namespace jreflect
     public:
         class_type() = default;
         virtual ~class_type() = default;
+
+        void initialize()
+        {
+            if (!m_Initialized)
+            {
+                m_Initialized = true;
+                initializeClassType();
+            }
+        }
 
         [[nodiscard]] virtual jutils::jstringID getName() const = 0;
         [[nodiscard]] virtual class_type* getParent() const = 0;
@@ -145,6 +155,8 @@ namespace jreflect
             std::size_t offset = 0;
         };
 
+        virtual void initializeClassType() {}
+
         virtual bool isDerivedFromClass(const class_type* type) const { return false; }
         
         template<typename T, typename ClassFieldFactory = class_field_factory_default>
@@ -155,6 +167,7 @@ namespace jreflect
     private:
 
         jutils::jmap<jutils::jstringID, class_field*> m_Fields;
+        bool m_Initialized = false;
         
         template<typename T>
         static bool InitClassField(class_field* field);
@@ -445,7 +458,7 @@ namespace jreflect
     JUTILS_TEMPLATE_CONDITION_IMPL(has_class_type_v<T>, typename T)
     bool class_type::InitClassField(class_field_object_ptr* field, jutils::int32)
     {
-        field->m_ClassType = class_type_info<T>::get_class_type();
+        field->m_ClassType = class_type_info<T>::get_class_type_raw();
         return true;
     }
 }
