@@ -16,58 +16,59 @@
     auto createInfo = Info;                                                             \
     createClassField<decltype(createInfo)::type>(createInfo.name, createInfo.offset);   \
 }
-#define JREFLECT_CLASS_TYPE(ClassName, ...)                                                                     \
-public:                                                                                                         \
-    using parent_t = this_t;                                                                                    \
-    using this_t = ClassName;                                                                                   \
-    class class_type_##ClassName : public parent_t::class_type_t                                                \
-    {                                                                                                           \
-    public:                                                                                                     \
-        using type = this_t;                                                                                    \
-        class_type_##ClassName() { __VA_OPT__(                                                                  \
-            static constexpr bool is_init = false;                                                              \
-            JUTILS_WRAP(JREFLECT_HELPER_CREATE_CLASS_FIELD, __VA_ARGS__)                                        \
-        ) }                                                                                                     \
-        [[nodiscard]] static jutils::jstringID GetName() { return #ClassName; }                                 \
-        [[nodiscard]] virtual jutils::jstringID getName() const override { return GetName(); }                  \
-        [[nodiscard]] static auto* GetParent() { return jreflect::class_type_info<parent_t>::get_class_type(); }\
-        [[nodiscard]] virtual jreflect::class_type* getParent() const override { return GetParent(); }          \
-    protected:                                                                                                  \
-        __VA_OPT__(virtual void initializeClassType() override {                                                \
-            parent_t::class_type_t::initializeClassType();                                                      \
-            initClassFields_##ClassName();                                                                      \
-        })                                                                                                      \
-        virtual bool isDerivedFromClass(const jreflect::class_type* type) const override                        \
-            { return (type::GetClassType() == this) || parent_t::class_type_t::isDerivedFromClass(type); }      \
-    private:                                                                                                    \
-        __VA_OPT__(void initClassFields_##ClassName();)                                                         \
-    };                                                                                                          \
-    using class_type_t = class_type_##ClassName;                                                                \
-    [[nodiscard]] static class_type_t* GetClassType_Raw() { static class_type_t classType; return &classType; } \
-    [[nodiscard]] static class_type_t* GetClassType() {                                                         \
-        class_type_t* classType = GetClassType_Raw(); classType->initialize(); return classType;                \
-    }                                                                                                           \
-    [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }        \
-protected:                                                                                                      \
-    virtual bool copyFromInternal(const jreflect::class_interface& value) override                              \
-    {                                                                                                           \
-        if constexpr (std::is_copy_assignable_v<this_t>)                                                        \
-        {                                                                                                       \
-            *this = dynamic_cast<const this_t&>(value);                                                         \
-            return true;                                                                                        \
-        }                                                                                                       \
-        assert(std::is_copy_assignable_v<ClassName>);                                                           \
-        return false;                                                                                           \
-    }                                                                                                           \
-    virtual bool moveFromInternal(class_interface&& value)                                                      \
-    {                                                                                                           \
-        if constexpr (std::is_move_assignable_v<this_t>)                                                        \
-        {                                                                                                       \
-            *this = std::move(dynamic_cast<this_t&&>(value));                                                   \
-            return true;                                                                                        \
-        }                                                                                                       \
-        return copyFromInternal(value);                                                                         \
-    }                                                                                                           \
+#define JREFLECT_CLASS_TYPE(ClassName, ...)                                                                         \
+public:                                                                                                             \
+    using parent_t = this_t;                                                                                        \
+    using this_t = ClassName;                                                                                       \
+    class class_type_##ClassName : public parent_t::class_type_t                                                    \
+    {                                                                                                               \
+    public:                                                                                                         \
+        using type = this_t;                                                                                        \
+        class_type_##ClassName() { __VA_OPT__(                                                                      \
+            static constexpr bool is_init = false;                                                                  \
+            JUTILS_WRAP(JREFLECT_HELPER_CREATE_CLASS_FIELD, __VA_ARGS__)                                            \
+        ) }                                                                                                         \
+        [[nodiscard]] static jutils::jstringID GetName() { return #ClassName; }                                     \
+        [[nodiscard]] virtual jutils::jstringID getName() const override { return GetName(); }                      \
+        [[nodiscard]] static auto* GetParent() { return jreflect::class_type_info<parent_t>::get_class_type(); }    \
+        [[nodiscard]] virtual jreflect::class_type* getParent() const override { return GetParent(); }              \
+    protected:                                                                                                      \
+        __VA_OPT__(virtual void initializeClassType() override {                                                    \
+            parent_t::class_type_t::initializeClassType();                                                          \
+            initClassFields_##ClassName();                                                                          \
+        })                                                                                                          \
+        virtual bool isDerivedFromClass(const jreflect::class_type* classType) const override                       \
+            { return (type::GetClassType() == classType) || parent_t::class_type_t::isDerivedFromClass(classType); }\
+        virtual class_interface* createObjectInternal() const override { return new type(); }                       \
+    private:                                                                                                        \
+        __VA_OPT__(void initClassFields_##ClassName();)                                                             \
+    };                                                                                                              \
+    using class_type_t = class_type_##ClassName;                                                                    \
+    [[nodiscard]] static class_type_t* GetClassType_Raw() { static class_type_t classType; return &classType; }     \
+    [[nodiscard]] static class_type_t* GetClassType() {                                                             \
+        class_type_t* classType = GetClassType_Raw(); classType->initialize(); return classType;                    \
+    }                                                                                                               \
+    [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }            \
+protected:                                                                                                          \
+    virtual bool copyFromInternal(const jreflect::class_interface& value) override                                  \
+    {                                                                                                               \
+        if constexpr (std::is_copy_assignable_v<this_t>)                                                            \
+        {                                                                                                           \
+            *this = dynamic_cast<const this_t&>(value);                                                             \
+            return true;                                                                                            \
+        }                                                                                                           \
+        assert(std::is_copy_assignable_v<ClassName>);                                                               \
+        return false;                                                                                               \
+    }                                                                                                               \
+    virtual bool moveFromInternal(class_interface&& value)                                                          \
+    {                                                                                                               \
+        if constexpr (std::is_move_assignable_v<this_t>)                                                            \
+        {                                                                                                           \
+            *this = std::move(dynamic_cast<this_t&&>(value));                                                       \
+            return true;                                                                                            \
+        }                                                                                                           \
+        return copyFromInternal(value);                                                                             \
+    }                                                                                                               \
 public:
     
 #define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                    \

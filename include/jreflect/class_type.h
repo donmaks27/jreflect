@@ -56,6 +56,11 @@ namespace jreflect
         [[nodiscard]] class_field_type getType() const { return m_Type; }
         [[nodiscard]] jutils::jstringID getName() const { return m_Name; }
 
+        template<class_field_type Type>
+        class_field_t<Type>* cast() { return getType() == Type ? dynamic_cast<class_field_t<Type>*>(this) : nullptr; }
+        template<class_field_type Type>
+        const class_field_t<Type>* cast() const { return getType() == Type ? dynamic_cast<const class_field_t<Type>*>(this) : nullptr; }
+
     protected:
 
         jutils::jstringID m_Name = jutils::jstringID_NONE;
@@ -158,6 +163,8 @@ namespace jreflect
         virtual void initializeClassType() {}
 
         virtual bool isDerivedFromClass(const class_type* type) const { return false; }
+
+        virtual class_interface* createObjectInternal() const { return nullptr; }
         
         template<typename T, typename ClassFieldFactory = class_field_factory_default>
         void createClassField(const jutils::jstringID& name, std::size_t offset);
@@ -303,10 +310,20 @@ namespace jreflect
             {
                 return false;
             }
+            const class_type* valueType = value.getClassType();
+            if ((valueType == nullptr) || !valueType->isDerivedFrom(m_ClassType))
+            {
+                return false;
+            }
             return valuePtr->copyFrom(value);
         }
         bool set(class_interface* object, class_interface&& value) const
         {
+            const class_type* valueClassType = value.getClassType();
+            if ((valueClassType == nullptr) || !valueClassType->isDerivedFrom(m_ClassType))
+            {
+                return false;
+            }
             auto* valuePtr = m_ClassType != nullptr ? getValuePtr<class_interface>(object) : nullptr;
             if (valuePtr == nullptr)
             {
@@ -355,7 +372,7 @@ namespace jreflect
             }
             if (value != nullptr)
             {
-                class_type* valueType = value->getClassType();
+                const class_type* valueType = value->getClassType();
                 if ((valueType == nullptr) || !valueType->isDerivedFrom(m_ClassType))
                 {
                     return false;
