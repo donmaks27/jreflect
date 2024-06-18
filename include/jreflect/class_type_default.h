@@ -2,19 +2,19 @@
 
 #pragma once
 
-#include "class_type.h"
+#include "field_value_default.h"
 
 #include <jutils/marco_wrap.h>
 
-#define JREFLECT_CLASS_FIELD_NAMED(Field, FieldName)                            \
-(jreflect::class_type::create_class_field_info<is_init, decltype(type::Field)>{ \
-    .name = (FieldName), .offset = offsetof(type, Field)                        \
+#define JREFLECT_CLASS_FIELD_NAMED(Field, FieldName)                        \
+(jreflect::class_type::create_field_info<is_init, decltype(type::Field)>{   \
+    .name = (FieldName), .offset = offsetof(type, Field)                    \
 })
 #define JREFLECT_CLASS_FIELD(Field) JREFLECT_CLASS_FIELD_NAMED(Field, #Field)
 
-#define JREFLECT_HELPER_CREATE_CLASS_FIELD(Info) {                                      \
-    auto createInfo = Info;                                                             \
-    createClassField<decltype(createInfo)::type>(createInfo.name, createInfo.offset);   \
+#define JREFLECT_HELPER_CREATE_CLASS_FIELD(Info) {                                                                      \
+    auto createInfo = Info;                                                                                             \
+    createField<decltype(createInfo)::type, jreflect::field_value_factory_default>(createInfo.name, createInfo.offset); \
 }
 #define JREFLECT_CLASS_TYPE(ClassName, ...)                                                                         \
 public:                                                                                                             \
@@ -35,13 +35,13 @@ public:                                                                         
     protected:                                                                                                      \
         __VA_OPT__(virtual void initializeClassType() override {                                                    \
             parent_t::class_type_t::initializeClassType();                                                          \
-            initClassFields_##ClassName();                                                                          \
+            initFields_##ClassName();                                                                          \
         })                                                                                                          \
         virtual bool isDerivedFromClass(const jreflect::class_type* classType) const override                       \
             { return (type::GetClassType() == classType) || parent_t::class_type_t::isDerivedFromClass(classType); }\
         virtual class_interface* createObjectInternal() const override { return new type(); }                       \
     private:                                                                                                        \
-        __VA_OPT__(void initClassFields_##ClassName();)                                                             \
+        __VA_OPT__(void initFields_##ClassName();)                                                             \
     };                                                                                                              \
     using class_type_t = class_type_##ClassName;                                                                    \
     [[nodiscard]] static class_type_t* GetClassType_Raw() { static class_type_t classType; return &classType; }     \
@@ -57,10 +57,10 @@ protected:                                                                      
             *this = dynamic_cast<const this_t&>(value);                                                             \
             return true;                                                                                            \
         }                                                                                                           \
-        assert(std::is_copy_assignable_v<ClassName>);                                                               \
+        assert(std::is_copy_assignable_v<this_t>);                                                                  \
         return false;                                                                                               \
     }                                                                                                               \
-    virtual bool moveFromInternal(class_interface&& value)                                                          \
+    virtual bool copyFromInternal(class_interface&& value) override                                                 \
     {                                                                                                               \
         if constexpr (std::is_move_assignable_v<this_t>)                                                            \
         {                                                                                                           \
@@ -71,12 +71,12 @@ protected:                                                                      
     }                                                                                                               \
 public:
     
-#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                    \
-        auto createInfo = Info;                                     \
-        initClassField<decltype(createInfo)::type>(createInfo.name);\
+#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                \
+        auto createInfo = Info;                                 \
+        initField<decltype(createInfo)::type>(createInfo.name); \
     }
-#define JREFLECT_INIT_CLASS_TYPE(Namespace, ClassName, ...)                             \
-    __VA_OPT__(void Namespace::ClassName::class_type_t::initClassFields_##ClassName() { \
-        static constexpr bool is_init = true;                                           \
-        JUTILS_WRAP(JREFLECT_HELPER_INIT_CLASS_FIELD, __VA_ARGS__)                      \
+#define JREFLECT_INIT_CLASS_TYPE(Namespace, ClassName, ...)                         \
+    __VA_OPT__(void Namespace::ClassName::class_type_t::initFields_##ClassName() {  \
+        static constexpr bool is_init = true;                                       \
+        JUTILS_WRAP(JREFLECT_HELPER_INIT_CLASS_FIELD, __VA_ARGS__)                  \
     })
