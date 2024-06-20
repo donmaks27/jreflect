@@ -14,6 +14,7 @@ namespace jreflect
     template<typename T>
     struct field_value_info_default : std::integral_constant<field_value_type, field_value_type::none>
     {
+        template<typename Factory>
         static field_value* create() { return nullptr; }
     };
 
@@ -40,7 +41,7 @@ namespace jreflect
     template<> struct field_value_default<field_value_type::Enum> { using type = field_value_default_##Enum; };         \
     template<> struct field_value_info_default<Type> : std::integral_constant<field_value_type, field_value_type::Enum> \
     {                                                                                                                   \
-        static field_value* create() { return new field_value_default_##Enum(); }                                       \
+        template<typename Factory> static field_value* create() { return new field_value_default_##Enum(); }            \
     }
 
     JREFLECT_HELPER_DECLARE_DEFAULT_PRIMITIVE_FIELD_VALUE(boolean,            bool);
@@ -105,17 +106,18 @@ namespace jreflect
     JUTILS_TEMPLATE_CONDITION((!std::is_pointer_v<T> && has_class_type_v<T>), typename T)
     struct field_value_info_default<T> : std::integral_constant<field_value_type, field_value_type::object>
     {
+        template<typename Factory>
         static field_value* create()
         {
-            return new field_value_default_object(class_type_info<T>::get_class_type());
+            return new field_value_default_object(get_class_type_raw<T>());
         }
     };
     
     class field_value_default_object_ptr : public field_value_object
     {
     public:
-        field_value_default_object_ptr()
-            : field_value_object(field_value_type::object_ptr)
+        field_value_default_object_ptr(class_type* objectType)
+            : field_value_object(field_value_type::object_ptr, objectType)
         {}
         virtual ~field_value_default_object_ptr() override = default;
 
@@ -153,9 +155,117 @@ namespace jreflect
     JUTILS_TEMPLATE_CONDITION((std::is_pointer_v<T>), typename T)
     struct field_value_info_default<T> : std::integral_constant<field_value_type, field_value_type::object_ptr>
     {
+        template<typename Factory>
         static field_value* create()
         {
-            return new field_value_default_object_ptr();
+            return new field_value_default_object_ptr(get_class_type_raw<std::remove_pointer_t<T>>());
+        }
+    };
+
+    class field_value_default_array : public field_value
+    {
+    protected:
+        field_value_default_array(field_value* elementValue)
+            : field_value(field_value_type::array), m_ElementValue(elementValue)
+        {}
+    public:
+        virtual ~field_value_default_array() override = default;
+
+        [[nodiscard]] field_value* getElementFieldValue() const { return m_ElementValue; }
+
+        [[nodiscard]] virtual jutils::index_type getSize(const void* valuePtr) const = 0;
+
+        [[nodiscard]] virtual void* get(void* valuePtr, jutils::index_type i) const = 0;
+        [[nodiscard]] virtual const void* get(const void* valuePtr, jutils::index_type i) const = 0;
+
+        virtual void* add(void* valuePtr, jutils::index_type i = jutils::index_invalid) const = 0;
+
+        virtual void remove(void* valuePtr, jutils::index_type i) const = 0;
+
+        virtual void clear(void* valuePtr) const = 0;
+
+    private:
+
+        field_value* m_ElementValue = nullptr;
+    };
+    template<typename T>
+    class field_value_default_array_impl : public field_value_default_array
+    {
+    public:
+        field_value_default_array_impl(field_value* elementValue)
+            : field_value_default_array(elementValue)
+        {}
+        virtual ~field_value_default_array_impl() override = default;
+
+        virtual jutils::index_type getSize(const void* valuePtr) const override
+        {
+            return valuePtr != nullptr ? GetArray(valuePtr)->getSize() : jutils::index_invalid;
+        }
+
+        virtual void* get(void* valuePtr, const jutils::index_type i) const override
+        {
+            if (valuePtr == nullptr)
+            {
+                return nullptr;
+            }
+            auto* valueArray = GetArray(valuePtr);
+            if (!valueArray->isValidIndex(i))
+            {
+                return nullptr;
+            }
+            return &valueArray->get(i);
+        }
+        virtual const void* get(const void* valuePtr, const jutils::index_type i) const override
+        {
+            if (valuePtr == nullptr)
+            {
+                return nullptr;
+            }
+            const auto* valueArray = GetArray(valuePtr);
+            if (!valueArray->isValidIndex(i))
+            {
+                return nullptr;
+            }
+            return &valueArray->get(i);
+        }
+
+        virtual void* add(void* valuePtr, const jutils::index_type i) const override
+        {
+            return valuePtr != nullptr ? &GetArray(valuePtr)->addDefaultAt(i) : nullptr;
+        }
+
+        virtual void remove(void* valuePtr, const jutils::index_type i) const override
+        {
+            if (valuePtr != nullptr)
+            {
+                GetArray(valuePtr)->removeAt(i);
+            }
+        }
+
+        virtual void clear(void* valuePtr) const override
+        {
+            if (valuePtr != nullptr)
+            {
+                GetArray(valuePtr)->clear();
+            }
+        }
+
+    private:
+
+        static jutils::jarray<T>* GetArray(void* valuePtr) { return static_cast<jutils::jarray<T>*>(valuePtr); }
+        static const jutils::jarray<T>* GetArray(const void* valuePtr) { return static_cast<const jutils::jarray<T>*>(valuePtr); }
+    };
+    template<> struct field_value_default<field_value_type::array>
+    {
+        using type = field_value_default_array;
+    };
+    template<typename ElemType>
+    struct field_value_info_default<jarray<ElemType>> : std::integral_constant<field_value_type, field_value_type::array>
+    {
+        template<typename Factory>
+        static field_value* create()
+        {
+            return new field_value_default_array_impl<ElemType>(create_field_value<ElemType, Factory>());
         }
     };
 
@@ -167,7 +277,7 @@ namespace jreflect
         template<typename T>
         using field_value_into = field_value_info_default<T>;
         template<typename T>
-        [[nodiscard]] static field_value* create() { return field_value_into<T>::create(); }
+        [[nodiscard]] static field_value* create() { return field_value_into<T>::template create<field_value_factory_default>(); }
     };
     template<field_value_type Type>
     using field_value_default_t = field_value_t<Type, field_value_factory_default>;

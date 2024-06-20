@@ -12,7 +12,8 @@ namespace jreflect
     {
         none,
         boolean, int8, uint8, int16, uint16, int32, uint32, int64, uint64, string,
-        object, object_ptr
+        object, object_ptr,
+        array
     };
     [[nodiscard]] constexpr const char* field_value_type_to_string(const field_value_type type)
     {

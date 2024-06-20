@@ -11,8 +11,36 @@
 namespace jreflect
 {
     class class_type;
-    class class_interface;
     class field_value_object;
+
+    class class_interface
+    {
+        friend field_value_object;
+
+    public:
+        class_interface() = default;
+        class_interface(const class_interface&) = default;
+        class_interface(class_interface&&) noexcept = default;
+        virtual ~class_interface() = default;
+
+        using this_t = class_interface;
+        using class_type_t = class_type;
+
+        class_interface& operator=(const class_interface&) = default;
+        class_interface& operator=(class_interface&&) noexcept = default;
+
+        [[nodiscard]] virtual class_type* getClassType() const = 0;
+
+    protected:
+
+        virtual bool copyFromInternal(const class_interface& value) { return false; }
+        virtual bool copyFromInternal(class_interface&& value) { return copyFromInternal(value); }
+
+    private:
+
+        inline bool copyFrom(const class_interface& value);
+        inline bool copyFrom(class_interface&& value);
+    };
 
     template<typename T>
     struct class_type_info
@@ -78,7 +106,7 @@ namespace jreflect
 
     protected:
 
-        template<bool IsInit, typename T>
+        template<typename T>
         struct create_field_info
         {
             using type = T;
@@ -94,62 +122,35 @@ namespace jreflect
         virtual class_interface* createObjectInternal() const { return nullptr; }
         
         template<typename T, typename FieldValueFactory>
-        void createField(const jutils::jstringID& name, std::size_t offset);
-        template<typename T>
-        void initField(const jutils::jstringID& name);
+        void createField(const jutils::jstringID& name, std::size_t offset)
+        {
+            if (!name.isValid())
+            {
+                return;
+            }
+
+            assert(!m_Fields.contains(name));
+
+            field_value* createdFieldValue = create_field_value<T, FieldValueFactory>();
+            assert(createdFieldValue != nullptr);
+            if (createdFieldValue == nullptr)
+            {
+                return;
+            }
+
+            m_Fields.put(name, createdFieldValue, name, offset);
+        }
 
     private:
 
         jutils::jmap<jutils::jstringID, field> m_Fields;
         bool m_Initialized = false;
-        
-        JUTILS_TEMPLATE_CONDITION(has_class_type_v<T>, typename T)
-        static bool InitField(field_value_object* field, jutils::int32);
-        template<typename T>
-        static bool InitField(field_value_object* field, jutils::int8) { return false; }
-    };
-
-    class class_interface
-    {
-        friend field_value_object;
-
-    public:
-        class_interface() = default;
-        class_interface(const class_interface&) = default;
-        class_interface(class_interface&&) noexcept = default;
-        virtual ~class_interface() = default;
-
-        using this_t = class_interface;
-        using class_type_t = class_type;
-
-        class_interface& operator=(const class_interface&) = default;
-        class_interface& operator=(class_interface&&) noexcept = default;
-
-        [[nodiscard]] virtual class_type* getClassType() const = 0;
-
-    protected:
-
-        virtual bool copyFromInternal(const class_interface& value) { return false; }
-        virtual bool copyFromInternal(class_interface&& value) { return copyFromInternal(value); }
-
-    private:
-
-        bool copyFrom(const class_interface& value)
-        {
-            return (&value != this) && (value.getClassType() == getClassType()) && copyFromInternal(value);
-        }
-        bool copyFrom(class_interface&& value)
-        {
-            return (&value != this) && (value.getClassType() == getClassType()) && copyFromInternal(std::move(value));
-        }
     };
 
     class field_value_object : public field_value
     {
-        friend class_type;
-
     protected:
-        field_value_object(const field_value_type type, class_type* objectType = nullptr)
+        field_value_object(const field_value_type type, class_type* objectType)
             : field_value(type), m_ObjectType(objectType)
         {}
     public:
@@ -166,51 +167,12 @@ namespace jreflect
         class_type* m_ObjectType = nullptr;
     };
 
-    template<typename T, typename FieldValueFactory>
-    void class_type::createField(const jutils::jstringID& name, const std::size_t offset)
+    inline bool class_interface::copyFrom(const class_interface& value)
     {
-        if (!name.isValid())
-        {
-            return;
-        }
-
-        const bool uniqueField = !m_Fields.contains(name);
-        assert(uniqueField);
-        field_value* fieldValue = create_field_value<T, FieldValueFactory>();
-        assert(fieldValue != nullptr);
-        if (fieldValue == nullptr)
-        {
-            return;
-        }
-
-        m_Fields.put(name, fieldValue, name, offset);
+        return (&value != this) && (value.getClassType() == getClassType()) && copyFromInternal(value);
     }
-
-    template<typename T>
-    void class_type::initField(const jutils::jstringID& name)
+    inline bool class_interface::copyFrom(class_interface&& value)
     {
-        auto* fieldPtr = m_Fields.find(name);
-        field_value_object* fieldValueObject = fieldPtr != nullptr ? dynamic_cast<field_value_object*>(fieldPtr->getFieldValue()) : nullptr;
-        if (fieldValueObject == nullptr)
-        {
-            return;
-        }
-        if (fieldValueObject->m_ObjectType != nullptr)
-        {
-            return;
-        }
-
-        const bool fieldInitialized = InitField<std::remove_pointer_t<T>>(fieldValueObject, 0);
-        assert(fieldInitialized);
-        if (!fieldInitialized)
-        {
-            m_Fields.remove(name);
-        }
-    }
-    JUTILS_TEMPLATE_CONDITION_IMPL(has_class_type_v<T>, typename T)
-    bool class_type::InitField(field_value_object* field, jutils::int32)
-    {
-        field->m_ObjectType = class_type_info<T>::get_class_type_raw();
-        return true;
+        return (&value != this) && (value.getClassType() == getClassType()) && copyFromInternal(std::move(value));
     }
 }
