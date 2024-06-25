@@ -128,25 +128,21 @@ namespace jreflect
         template<typename T1>
         static constexpr bool _helper_has_class_type = !std::is_same_v<_helper_class_type_t<T1>, class_type>;
 
-        JUTILS_TEMPLATE_CONDITION(_helper_has_class_type<T1>, typename T1, bool Raw)
-        [[nodiscard]] static auto* _helper_get_class_type(jutils::int32) { return Raw ? T1::GetClassType_Raw() : T1::GetClassType(); }
-        template<typename T1, bool>
+        JUTILS_TEMPLATE_CONDITION(_helper_has_class_type<T1>, typename T1)
+        [[nodiscard]] static auto* _helper_get_class_type(jutils::int32) { return T1::GetClassType(); }
+        template<typename T1>
         [[nodiscard]] static class_type* _helper_get_class_type(jutils::int8) { return nullptr; }
 
     public:
-        static constexpr bool has_class_type = _helper_has_class_type<jutils::remove_cvref_t<T>>;//!std::is_same_v<_helper_class_type_t<jutils::remove_cvref_t<T>>, class_type>;
+        static constexpr bool has_class_type = _helper_has_class_type<jutils::remove_cvref_t<T>>;
         using class_type_t = _helper_class_type_t<jutils::remove_cvref_t<T>>;
         
-        [[nodiscard]] static auto* get_class_type_raw() { return _helper_get_class_type<jutils::remove_cvref_t<T>, true>(0); }
-        [[nodiscard]] static auto* get_class_type() { return _helper_get_class_type<jutils::remove_cvref_t<T>, false>(0); }
+        [[nodiscard]] static auto* get_class_type() { return _helper_get_class_type<jutils::remove_cvref_t<T>>(0); }
     };
     template<typename T>
     using class_type_t = typename class_type_info<T>::class_type_t;
     template<typename T>
     constexpr bool has_class_type_v = class_type_info<T>::has_class_type;
-    // TODO: Get rid of raw functions, move initialization to generated file
-    template<typename T>
-    [[nodiscard]] auto* get_class_type_raw() { return class_type_info<T>::get_class_type_raw(); }
     template<typename T>
     [[nodiscard]] auto* get_class_type() { return class_type_info<T>::get_class_type(); }
 
@@ -384,7 +380,7 @@ namespace jreflect
     class value_object_impl : public value_object
     {
     public:
-        value_object_impl() : value_object(get_class_type_raw<T>()) {}
+        value_object_impl() : value_object(get_class_type<T>()) {}
 
     protected:
 
@@ -484,7 +480,7 @@ namespace jreflect
         static constexpr bool valid = true;
 
         value_object_ptr_impl()
-            : value_object_ptr(get_class_type_raw<type>())
+            : value_object_ptr(get_class_type<type>())
         {}
 
     protected:

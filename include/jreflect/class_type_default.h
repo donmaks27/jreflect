@@ -37,12 +37,8 @@ public:                                                                         
         __VA_OPT__(void initFields_##ClassName();)                                                                  \
     };                                                                                                              \
     using class_type_t = class_type_##ClassName;                                                                    \
-    [[nodiscard]] static class_type_t* GetClassType_Raw() { static class_type_t classType; return &classType; }     \
-    [[nodiscard]] static class_type_t* GetClassType() {                                                             \
-        class_type_t* classType = GetClassType_Raw(); classType->initialize(); return classType;                    \
-    }                                                                                                               \
-    [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }            \
-public:
+    [[nodiscard]] static class_type_t* GetClassType()  { static class_type_t classType; return &classType; }        \
+    [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }
     
 #define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                                \
     auto createInfo = Info;                                                     \
