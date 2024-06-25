@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "field_value_default.h"
+#include "class_type.h"
 
 #include <jutils/marco_wrap.h>
 
@@ -42,31 +42,11 @@ public:                                                                         
         class_type_t* classType = GetClassType_Raw(); classType->initialize(); return classType;                    \
     }                                                                                                               \
     [[nodiscard]] virtual jreflect::class_type* getClassType() const override { return GetClassType(); }            \
-protected:                                                                                                          \
-    virtual bool copyFromInternal(const jreflect::class_interface& value) override                                  \
-    {                                                                                                               \
-        if constexpr (std::is_copy_assignable_v<this_t>)                                                            \
-        {                                                                                                           \
-            *this = dynamic_cast<const this_t&>(value);                                                             \
-            return true;                                                                                            \
-        }                                                                                                           \
-        assert(std::is_copy_assignable_v<this_t>);                                                                  \
-        return false;                                                                                               \
-    }                                                                                                               \
-    virtual bool copyFromInternal(class_interface&& value) override                                                 \
-    {                                                                                                               \
-        if constexpr (std::is_move_assignable_v<this_t>)                                                            \
-        {                                                                                                           \
-            *this = std::move(dynamic_cast<this_t&&>(value));                                                       \
-            return true;                                                                                            \
-        }                                                                                                           \
-        return copyFromInternal(value);                                                                             \
-    }                                                                                                               \
 public:
     
-#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                                                                        \
-    auto createInfo = Info;                                                                                             \
-    createField<decltype(createInfo)::type, jreflect::field_value_factory_default>(createInfo.name, createInfo.offset); \
+#define JREFLECT_HELPER_INIT_CLASS_FIELD(Info) {                                \
+    auto createInfo = Info;                                                     \
+    createField<decltype(createInfo)::type>(createInfo.name, createInfo.offset);\
 }
 #define JREFLECT_INIT_CLASS_TYPE(Namespace, ClassName, ...)                     \
 __VA_OPT__(void Namespace::ClassName::class_type_t::initFields_##ClassName() {  \
